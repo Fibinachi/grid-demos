@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buddhist schools of thought in GRID — Southern California sites</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+  body{background:#000;color:#e8e8e8;font-family:system-ui,Arial,sans-serif;margin:0}
+  header{padding:16px 20px;border-bottom:1px solid #333}
+  header h1{font-size:20px;margin:0 0 6px}
+  header p{margin:4px 0;color:#bbb;font-size:14px;line-height:1.5}
+  .wrap{display:flex;flex-wrap:wrap}
+  #map{height:70vh;flex:3 1 560px;min-width:320px;background:#000}
+  aside{flex:1 1 300px;padding:16px;border-left:1px solid #333}
+  button{background:#222;color:#fff;border:1px solid #555;padding:8px 12px;margin:0 6px 8px 0;cursor:pointer}
+  button.active{background:#00e676;color:#000;border-color:#00e676}
+  select{background:#222;color:#fff;border:1px solid #555;padding:6px;width:100%;margin:6px 0 12px}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  td,th{border-bottom:1px solid #333;padding:4px 6px;text-align:left}
+  td:last-child,th:last-child{text-align:right}
+  .note{font-size:13px;color:#bbb;line-height:1.5}
+  .leaflet-popup-content{color:#111}
+  a{color:#7fd4ff}
+</style>
+</head>
+<body>
+<header>
+  <h1>Buddhist schools of thought in GRID: Southern California sites</h1>
+  <p><strong>What this map shows.</strong> Global view: aggregated counts only, from the staged taxonomy file (snapshot 2026-10-23). Southern California view: one marker per site in the open DOI slice, 413 active sites.</p>
+  <p><strong>What it deliberately does NOT show.</strong> No global per-site coordinates anywhere on this page. The global Buddhist sites file is a separate commercial edition under paid 14QBD273 licence and is not released by this map. The deposit copy of this map governs if it ever differs from a live copy.</p>
+  <p><strong>Label gap, in plain language.</strong> GRID classifies a site by the tradition or school it belongs to (Zen, Pure Land, Tibetan, Theravada, and so on), not by the philosophy it teaches. Yogachara and Madhyamaka are doctrines, and GRID carries no label for either. School detail in practice lives in the text columns, not the ID columns: in this slice, legacy_id is present for only 3 of 413 rows, tradition_id for 2, movement_id for 2.</p>
+  <p>Licence: CC BY-NC 4.0 for the DOI files only. Credit line, exact: unlocked on requisition of Hyacinth Macaw. Commercial availability: the full global Buddhist dataset is available under commercial 14QBD273 licence through charles@gridataset.com, no price stated.</p>
+</header>
+<div>
+  <button id="btnGlobal" class="active">Global counts view</button>
+  <button id="btnSocal">Southern California: detailed points</button>
+  <label for="schoolFilter" style="margin-left:8px">Filter SoCal points by school (tradition text):</label>
+  <select id="schoolFilter"><option value="">All schools (413)</option></select>
+</div>
+<div class="wrap">
+  <div id="map"></div>
+  <aside>
+    <h2 id="panelTitle">Global counts (aggregated only)</h2>
+    <p class="note">Global Buddhist-faith sites, 2026-10-23 re-pull: <strong>250,043</strong>, of which 250,029 carry coordinates. Counts below are sites by taxonomy ID. ID labels are mostly blank below faith level (legacy blank for 241,099 rows; tradition blank for 242,637; movement blank for 249,037), which is why the SoCal school detail is carried in text columns.</p>
+    <div id="panel"></div>
+    <h3>Southern California, by school (text)</h3>
+    <div id="socalPanel"></div>
+    <p class="note">SoCal counts match hyacinth-buddhist-socal-by-school.csv exactly and sum to 413. SoCal box: latitude 33.3 to 35.0, longitude -119.0 to -117.0; status IS NULL only (20 merged rows excluded). Country in this slice: United States 411, blank 2 (two Los Angeles sites whose stored address country code conflicts with their coordinates; left blank, not guessed).</p>
+    <p class="note"><strong>Gap, stated plainly:</strong> the staged package contains no global country totals, so this map's global panel is by taxonomy ID, not by country. No country figures have been invented to fill that gap. A global country-counts panel would need a separate, approved aggregate-only query against the live database (counts only, no coordinates); it is not in this build.</p>
+  </aside>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+const map = L.map('map', {worldCopyJump:true}).setView([20,0], 2);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution:'&copy; OpenStreetMap contributors &copy; CARTO', maxZoom:19
+}).addTo(map);
+let cluster = null, data = null;
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function table(rows){return '<table><tr><th>Node</th><th>Sites by ID</th></tr>' + rows.map(r=>'<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>').join('') + '</table>';}
+fetch('hyacinth-map-data.json').then(r=>r.json()).then(d=>{
+  data = d;
+  const sel = document.getElementById('schoolFilter');
+  d.socal_by_school.forEach(row=>{
+    const o = document.createElement('option');
+    o.value = row.tradition_text; o.textContent = (row.tradition_text || '(blank tradition text)') + ' (' + row.site_count + ')';
+    sel.appendChild(o);
+  });
+  document.getElementById('socalPanel').innerHTML = table(d.socal_by_school.map(r=>[r.tradition_text || '(blank)', r.site_count]));
+  showGlobal();
+  sel.addEventListener('change', ()=>{ if(document.getElementById('btnSocal').classList.contains('active')) showSocal(); });
+  document.getElementById('btnGlobal').addEventListener('click', showGlobal);
+  document.getElementById('btnSocal').addEventListener('click', showSocal);
+});
+function showGlobal(){
+  document.getElementById('btnGlobal').classList.add('active');
+  document.getElementById('btnSocal').classList.remove('active');
+  document.getElementById('panelTitle').textContent = 'Global counts (aggregated only)';
+  if(cluster){ map.removeLayer(cluster); cluster=null; }
+  map.setView([20,0], 2);
+  const by = layer => data.taxonomy.filter(r=>r.layer===layer).map(r=>[r.name + (r.deprecated==='yes' ? ' [deprecated]' : ''), r.sites_by_id]);
+  document.getElementById('panel').innerHTML =
+    '<h3>Faith</h3>' + table(by('faith')) +
+    '<h3>Legacy</h3>' + table(by('legacy')) +
+    '<h3>Tradition</h3>' + table(by('tradition')) +
+    '<h3>Movement</h3>' + table(by('movement'));
+}
+function showSocal(){
+  document.getElementById('btnSocal').classList.add('active');
+  document.getElementById('btnGlobal').classList.remove('active');
+  document.getElementById('panelTitle').textContent = 'Southern California: detailed points (413)';
+  if(cluster){ map.removeLayer(cluster); }
+  cluster = L.markerClusterGroup();
+  const f = document.getElementById('schoolFilter').value;
+  let n = 0;
+  data.points.forEach(p=>{
+    if(f && p.tradition_text !== f) return;
+    n++;
+    const m = L.marker([p.lat, p.lon]);
+    m.bindPopup('<strong>'+esc(p.name)+'</strong><br>School (tradition text): '+esc(p.tradition_text || '(blank)')+'<br>Legacy text: '+esc(p.legacy_text || '(blank)')+'<br>Country: '+esc(p.country || '(blank)')+'<br>GRID id: '+esc(p.grid_id));
+    cluster.addLayer(m);
+  });
+  map.addLayer(cluster);
+  map.setView([34.0, -118.0], 9);
+  document.getElementById('panel').innerHTML = '<p class="note">Showing '+n+' of 413 SoCal sites' + (f ? ' for school: '+esc(f) : '') + '. Markers cluster at low zoom and uncluster as you zoom in.</p>';
+}
+</script>
+</body>
+</html>
